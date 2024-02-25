@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
   warning = FALSE,
   message = FALSE,
   cache = FALSE,
-  fig.width = 10
+  fig.width = 12
 )
 
 library(fs)
@@ -89,9 +89,11 @@ gas_tidy |>
   theme_hr
 ```
 
+<br>
 
 ```{r}
 #| label: gas-monthly-year-facet
+#| fig-height: 8
 
 gas_tidy |>
   ggplot(aes(month_label, billed_gj, fill = as.factor(year))) +
@@ -108,10 +110,12 @@ gas_tidy |>
   scale_fill_viridis_d(direction = -1) +
   facet_wrap(facets = vars(year)) +
   theme_minimal() +
+  theme_hr +
   theme(legend.position = "none",
-        axis.text.x = element_text(size = 8)) +
-  theme_hr
+        axis.text.x = element_text(size = 8))
 ```
+
+<br>
 
 ```{r}
 #| label: gas-monthly-year-line
@@ -207,9 +211,11 @@ hydro_monthly |>
   theme_hr
 ```
 
+<br>
 
 ```{r}
 #| label: hydro-monthy-year-facet
+#| fig-height: 10
 
 hydro_monthly |>
   ggplot(aes(
@@ -238,6 +244,7 @@ hydro_monthly |>
   theme_hr
 ```
 
+<br>
 
 ```{r}
 #| label: hydro-monthy-year-line
@@ -268,6 +275,46 @@ hydro_monthly |>
   theme_hr
 ```
 
+<br>
+
+```{r}
+#| label: hydro-weekly
+#| fig-height: 10
+
+hydro_weekly <- hydro_tidy |>
+  mutate(year = year(date),
+         month = month(date),
+         week = week(date)) |>
+  group_by(year, month, week) |>
+  summarise(weekly_consumption_k_wh = sum(net_consumption_k_wh)) |>
+  mutate(
+    month_label = month(month, label = TRUE),
+    colr = case_when(year == "2024" ~ "2024",
+                     year == "2023" ~ "2023",
+                     .default = "Previous Year")
+  )
+
+hydro_weekly |> 
+    ggplot(aes(
+    month_label,
+    weekly_consumption_k_wh,
+    group = year,
+    fill = as.factor(year)
+  )) +
+  geom_col(position = position_dodge2()) +
+  geom_hline(yintercept = 400, linetype = 2) +
+  facet_wrap(facets = vars(year)) +
+  labs(title = "Weekly Consumption kWh",
+       fill = NULL,
+       x = NULL,
+       y = NULL) +
+  scale_fill_viridis_d(direction = -1) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme_hr
+```
+
+<br>
 
 ```{r}
 #| label: hydro-costs-df
@@ -314,6 +361,8 @@ hydro_costs_tidy |>
 ```
 
 ```{r}
+#| label: hydro-costs-change
+
 avg_costs <- hydro_costs_tidy |>
   filter(!year == "2024") |>
   group_by(month) |>
