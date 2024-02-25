@@ -314,6 +314,14 @@ hydro_costs_tidy |>
 ```
 
 ```{r}
+avg_costs <- hydro_costs_tidy |>
+  filter(!year == "2024") |>
+  group_by(month) |>
+  summarise(avg_cost = mean(cost_electricity))
 
+cost_change <- hydro_costs_tidy |>
+  filter(year == "2024") |>
+  left_join(avg_costs) |>
+  mutate(percent_change = (cost_electricity / avg_cost - 1) * 100)
 ```
 
