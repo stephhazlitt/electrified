@@ -4,5 +4,113 @@ format: html
 editor: source
 ---
 
+```{r}
+#| label: setup
+#| include: false
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  cache = FALSE,
+  fig.width = 10
+)
+
+library(fs)
+library(readr)
+library(janitor)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+# library(tidyr)
+# library(gt)
+
+# chart stuff
+colrs <- c("2024" = "#3182bd",
+             "Previous Years" = "grey80")
+```
+
+
 ## Gas (Fortis)
+
+- gas usage (Billed GJ) data available from FortisBC
+- data from gas connection date of August 2019
+
+```{r}
+#| label: gas-df
+
+gas_files <- dir_ls("data/gas/", glob = "*.csv")
+
+df_gas_raw <- read_csv(gas_files)
+
+df_gas_tidy <- df_gas_raw |>
+  select(-`...6`) |>
+  clean_names() |>
+  distinct() |>
+  mutate(
+    date = as_date(bill_from_date, format = "%d/%m/%Y"),
+    year = year(date),
+    month = month(date),
+    month_label = month(month, label = TRUE),
+    colr = ifelse(year == year(Sys.Date()), "2024", "Previous Years")
+  )
+```
+
+
+```{r}
+#| label: gas-monthly
+
+df_gas_tidy |>
+  ggplot(aes(month_label, billed_gj, group = year, fill = colr)) +
+  geom_col(position = position_dodge2()) +
+  labs(title = "Monthly Billed GJ Gas",
+       fill = NULL,
+       x = NULL,
+       y = NULL) +
+  scale_y_continuous(
+    expand = c(0, 0),
+    limits = c(0, 5.5),
+    breaks = seq(0, 5.5, 1)
+  ) +
+  scale_fill_manual(values = colrs) +
+  theme_minimal()
+```
+
+
+```{r}
+#| label: gas-monthly-year
+
+df_gas_tidy |>
+  ggplot(aes(month_label, billed_gj, fill = as.factor(year))) +
+  geom_col(position = position_dodge2()) +
+  labs(title = "Monthly Billed GJ Gas by Year",
+       fill = NULL,
+       x = NULL,
+       y = NULL) +
+  scale_y_continuous(
+    expand = c(0, 0),
+    limits = c(0, 5.5),
+    breaks = seq(0, 5.5, 1)
+  ) +
+  scale_fill_viridis_d(direction = -1) +
+  facet_wrap(facets = vars(year)) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 8)
+        )
+
+```
+
+
+## Electricity (BC Hydro)
+
+- electricity Usage (kWh) data available from BC Hydro
+- data from BC Hydro available from 2018
+- heat pump installed May 2021
+
+```{r}
+#| label: electricity-df
+
+
+```
 
