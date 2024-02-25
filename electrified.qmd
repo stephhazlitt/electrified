@@ -22,18 +22,27 @@ library(janitor)
 library(dplyr)
 library(lubridate)
 library(ggplot2)
-# library(tidyr)
-# library(gt)
+library(tidyr)
 
 # chart stuff
-colrs <- c("2024" = "#3182bd",
-             "Previous Years" = "grey80")
+colrs <- c(
+  "2024" = "#2171b5",
+  "2023" = "#9ecae1",
+  "Previous Years" = "grey80"
+)
+
+theme_hr <- theme(
+  plot.title = element_text(size = 16, face = "bold"),
+  axis.text = element_text(size = 12),
+  legend.text = element_text(size = 12),
+  strip.text = element_text(size = 12)
+)
 ```
 
 
-## Gas (Fortis)
+## Gas
 
-- gas usage (Billed GJ) data available from FortisBC
+- gas usage (billed GJ) data available from FortisBC
 - data from gas connection date of August 2019
 
 ```{r}
@@ -41,9 +50,9 @@ colrs <- c("2024" = "#3182bd",
 
 gas_files <- dir_ls("data/gas/", glob = "*.csv")
 
-df_gas_raw <- read_csv(gas_files)
+gas_raw <- read_csv(gas_files)
 
-df_gas_tidy <- df_gas_raw |>
+gas_tidy <- gas_raw |>
   select(-`...6`) |>
   clean_names() |>
   distinct() |>
@@ -52,15 +61,18 @@ df_gas_tidy <- df_gas_raw |>
     year = year(date),
     month = month(date),
     month_label = month(month, label = TRUE),
-    colr = ifelse(year == year(Sys.Date()), "2024", "Previous Years")
+    # colr = ifelse(year == year(Sys.Date()), "2024", "Previous Years")
+    colr = case_when(year == "2024" ~ "2024",
+                     year == "2023" ~ "2023",
+                     .default = "Previous Years")
   )
 ```
 
 
 ```{r}
-#| label: gas-monthly
+#| label: gas-monthly-bar
 
-df_gas_tidy |>
+gas_tidy |>
   ggplot(aes(month_label, billed_gj, group = year, fill = colr)) +
   geom_col(position = position_dodge2()) +
   labs(title = "Monthly Billed GJ Gas",
@@ -73,14 +85,15 @@ df_gas_tidy |>
     breaks = seq(0, 5.5, 1)
   ) +
   scale_fill_manual(values = colrs) +
-  theme_minimal()
+  theme_minimal() +
+  theme_hr
 ```
 
 
 ```{r}
-#| label: gas-monthly-year
+#| label: gas-monthly-year-facet
 
-df_gas_tidy |>
+gas_tidy |>
   ggplot(aes(month_label, billed_gj, fill = as.factor(year))) +
   geom_col(position = position_dodge2()) +
   labs(title = "Monthly Billed GJ Gas by Year",
@@ -96,21 +109,211 @@ df_gas_tidy |>
   facet_wrap(facets = vars(year)) +
   theme_minimal() +
   theme(legend.position = "none",
-        axis.text.x = element_text(size = 8)
-        )
+        axis.text.x = element_text(size = 8)) +
+  theme_hr
+```
 
+```{r}
+#| label: gas-monthly-year-line
+
+gas_tidy |>
+  ggplot(aes(
+    month_label,
+    billed_gj,
+    group = year,
+    colour = as.factor(year)
+  )) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Monthly Billed GJ Gas by Year",
+    colour = NULL,
+    x = NULL,
+    y = NULL
+  ) +
+  scale_y_continuous(
+    expand = c(0, 0),
+    limits = c(0, 5.5),
+    breaks = seq(0, 5.5, 1)
+  ) +
+  scale_colour_viridis_d(direction = -1) +
+  theme_minimal() +
+  guides(color = guide_legend(reverse = TRUE)) +
+  theme_hr
+```
+
+Notes:
+
+ - gas fireplace was the primary heat source for Feb+Mar 2021 (we ran out of furnace oil)
+ - Jan 2024 was _veeerrry_ cold (-10 degrees C for many days)
+
+
+## Electricity
+
+- electricity usage (kWh) data available from BCHydro
+- data available from 2018
+- heat pump May 2021
+- electric car December 2023
+
+```{r}
+#| label: hydro-df
+
+hydro_files <- dir_ls("data/hydro-use/", glob = "*.csv")
+
+hydro_raw <- read_csv(hydro_files)
+
+hydro_tidy <- hydro_raw |>
+  clean_names() |>
+  select(-demand_k_w,-power_factor_percent) |>
+  distinct() |>
+  mutate(
+    date = as.Date(interval_start_date_time),
+    date = as_date(date, format = "%Y/%m/%d")
+  )
+
+hydro_monthly <- hydro_tidy |>
+  mutate(year = year(date),
+         month = month(date)) |>
+  group_by(year, month) |>
+  summarise(monthly_consumption_k_wh = sum(net_consumption_k_wh)) |>
+  mutate(
+    month_label = month(month, label = TRUE),
+    # colr = ifelse(year == year(Sys.Date()), "2024", "Previous Years")
+    colr = case_when(year == "2024" ~ "2024",
+                     year == "2023" ~ "2023",
+                     .default = "Previous Years")
+  )
 ```
 
 
-## Electricity (BC Hydro)
+```{r}
+#| label: hydro-monthly-bar
 
-- electricity Usage (kWh) data available from BC Hydro
-- data from BC Hydro available from 2018
-- heat pump installed May 2021
+hydro_monthly |>
+  ggplot(aes(
+    month_label,
+    monthly_consumption_k_wh,
+    group = year,
+    fill = colr
+  )) +
+  geom_col(position = position_dodge2()) +
+  labs(title = "Monthly Consumption kWh",
+       fill = NULL,
+       x = NULL,
+       y = NULL) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_manual(values = colrs) +
+  theme_minimal() +
+  theme_hr
+```
+
 
 ```{r}
-#| label: electricity-df
+#| label: hydro-monthy-year-facet
 
+hydro_monthly |>
+  ggplot(aes(
+    month_label,
+    monthly_consumption_k_wh,
+    group = year,
+    colour = as.factor(year)
+  )) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Monthly Consumption kWh by Year",
+    colour = NULL,
+    x = NULL,
+    y = NULL
+  ) +
+  scale_y_continuous(
+    expand = c(0, 0),
+    limits = c(0, 2100),
+    breaks = seq(0, 2100, 500)
+  ) +
+  scale_color_viridis_d(direction = -1) +
+  facet_wrap(facets = vars(year)) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme_hr
+```
+
+
+```{r}
+#| label: hydro-monthy-year-line
+
+hydro_monthly |>
+  ggplot(aes(
+    month_label,
+    monthly_consumption_k_wh,
+    group = year,
+    colour = as.factor(year)
+  )) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Monthly Consumption kWh by Year",
+    colour = NULL,
+    x = NULL,
+    y = NULL
+  ) +
+  scale_y_continuous(
+    expand = c(0, 0),
+    limits = c(0, 2100),
+    breaks = seq(0, 2100, 500)
+  ) +
+  scale_color_viridis_d(direction = -1) +
+  guides(color = guide_legend(reverse = TRUE)) +
+  theme_minimal() +
+  theme_hr
+```
+
+
+```{r}
+#| label: hydro-costs-df
+
+hydro_costs_files <- dir_ls("data/hydro-bill/", glob = "*.csv")
+
+hydro_costs_raw <- read_csv(hydro_costs_files)
+
+hydro_costs_tidy <- hydro_costs_raw |>
+  clean_names() |>
+  mutate(
+    bill_date = as_date(invoice_date),
+    year = year(bill_date),
+    month = month(bill_date),
+    month_label = month(month, label = TRUE),
+    colr = case_when(year == "2024" ~ "2024",
+                     year == "2023" ~ "2023",
+                     .default = "Previous Years")
+  ) |>
+  select(bill_date, year, month, month_label, cost_electricity = amount_due, colr) |>
+  drop_na()
+```
+
+
+```{r}
+#| label: hydro-costs-bar
+
+hydro_costs_tidy |>
+  ggplot(aes(
+    month_label,
+    cost_electricity,
+    group = year,
+    fill = colr
+  )) +
+  geom_col(position = position_dodge2()) +
+  labs(title = "Hydro Costs $",
+       fill = NULL,
+       x = NULL,
+       y = NULL) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_fill_manual(values = colrs) +
+  theme_minimal() +
+  theme_hr
+```
+
+```{r}
 
 ```
 
